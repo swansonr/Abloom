@@ -1,0 +1,376 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Journal Article
+% LaTeX Template
+% Version 1.1 (25/11/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Original author:
+% Frits Wenneker (http://www.howtotex.com)
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[twoside]{article}
+
+\usepackage{lipsum} % Package to generate dummy text throughout this template
+
+\usepackage[sc]{mathpazo} % Use the Palatino font
+\usepackage[T1]{fontenc} % Use 8-bit encoding that has 256 glyphs
+\linespread{1.05} % Line spacing - Palatino needs more space between lines
+\usepackage{microtype} % Slightly tweak font spacing for aesthetics
+
+\usepackage[hmarginratio=1:1,top=32mm,columnsep=20pt]{geometry} % Document margins
+%\usepackage{multicol} % Used for the two-column layout of the document
+\usepackage{hyperref} % For hyperlinks in the PDF
+
+\usepackage[hang, small,labelfont=bf,up,textfont=it,up]{caption} % Custom captions under/above floats in tables or figures
+\usepackage{booktabs} % Horizontal rules in tables
+\usepackage{float} % Required for tables and figures in the multi-column environment - they need to be placed in specific locations with the [H] (e.g. \begin{table}[H])
+
+\usepackage{lettrine} % The lettrine is the first enlarged letter at the beginning of the text
+\usepackage{paralist} % Used for the compactitem environment which makes bullet points with less space between them
+
+\usepackage{graphicx}
+
+\usepackage{abstract} % Allows abstract customization
+\renewcommand{\abstractnamefont}{\normalfont\bfseries} % Set the "Abstract" text to bold
+\renewcommand{\abstracttextfont}{\normalfont} % Set the abstract itself to small italic text
+
+\usepackage{titlesec} % Allows customization of titles
+%\renewcommand\thesection{\Roman{section}}
+\titleformat{\section}[block]{\large\scshape\centering}{\thesection.}{1em}{} % Change the look of the section titles
+
+\usepackage{fancyhdr} % Headers and footers
+\pagestyle{fancy} % All pages have headers and footers
+\fancyhead{} % Blank out the default header
+\fancyfoot{} % Blank out the default footer
+\fancyfoot[RO,LE]{\thepage} % Custom footer text
+
+\usepackage[toc,page]{appendix}
+
+%\usepackage{subfig}
+\usepackage{subcaption}
+
+%----------------------------------------------------------------------------------------
+%	TITLE SECTION
+%----------------------------------------------------------------------------------------
+
+\title{\vspace{-15mm}\fontsize{24pt}{10pt}\selectfont\textbf{A Brief Introduction to Approximate Membership Query Data Structures}} 
+
+\author{
+\large
+\textsc{Robin Swanson}\\[2mm]
+\normalsize University of Manitoba \\ \normalsize COMP4420 - Advanced Analysis of Algorithms \\
+\normalsize \href{mailto:umswans5@cc.umanitoba.ca}{[umswans5@cc.umanitoba.ca}
+%\vspace{-5mm}
+}
+\date{April 2014}
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+\maketitle % Insert title
+
+\thispagestyle{fancy} % All pages have headers and footers
+
+%----------------------------------------------------------------------------------------
+%	ABSTRACT
+%----------------------------------------------------------------------------------------
+
+\begin{abstract}
+\noindent 
+In this paper we discuss and evaluate two probabilistic data structures, the bloom filter and the quotient filter which belong the class of approximate membership query (AMQ) data structures. Both data structures promise fast updates and searches and compact space requirements through the use of hashing techniques. However, unlike a traditional hash table, false positives, i.e., a query returns true despite the value not being in the hash table, are possible. Here we compare their merits, use cases, as well as analyze their run time, space requirements, and cache performance. We found that our Bloom Filter had better query performance while using less space. The Quotient Filter, on the other hand, was able to guarantee much better false positive ratios at the cost of more disk space.
+
+\noindent
+\emph{\\ Keywords: Bloom, Bender, Hash, Quotient, Filter}
+\end{abstract}
+
+%----------------------------------------------------------------------------------------
+%	ARTICLE CONTENTS
+%----------------------------------------------------------------------------------------
+
+\section{Introduction}
+
+Traditional hashing tables map values to indexes, or buckets, through the use of hashing techniques. In an ideal scenario each value would be hashed to a unique index for storage. However, due to limitations in space and perfect hashing techniques many coping methods have been introduced to account for collisions (when two unique values evaluate to the same index). Many collision resolutions exist including chaining, open addressing, and cuckoo hashing (among many others). Approximate membership query data structures provide only probabilistic resolution of collisions, meaning while false negative queries are not possible there is a probability of returning false positive queries. This probability depends on the size of the hashing area, the number of values inserted, as well as other implementation dependent variables.
+
+At the cost of probabilistic errors, AMQs provide space and time efficient means of querying a set. These techniques are useful for applications in which a large data set would be impossible to store in resident memory. A fast AMQ could be checked, and if present, a more costly storage based lookup could be performed. In particular, applications where the vast majority of queries are presumed to be false can benefit from the reduced storage footprint at minimal costs.
+
+Some uses of AMQs include Google's BigTable which uses bloom filters to reduce disk lookups of non-existant rows and columns\cite{google}, Bitcoin to verify payments\cite{bitcoin}, and by various chemical structure databases to lookup molecular substructures\cite{chemicals}.
+
+\section{Probabilistic Data Structures}
+
+\subsection{Bloom Filter}
+
+The Bloom Filter was introduced by Burton Howard Bloom in 1970 \cite{bloom}. Bloom described a variation of the traditional hash table which, for a bit vector of size $m$ bits, would evaluate $k$ unique hashes for every value inserted and set each corresponding bit to one. Queries, then, would simply be to check all $k$ hashes and return true if and only if each corresponding bit is set to one.
+
+Bloom also gave the example application of a hyphenation dictionary of 500,000 words. In this dictionary 90\% of hyphenations followed simple rules while the remaining 10\% required specific patterns stored on disk. He was able, with the use of his Bloom Filter, to create a hash of only 15\% the size of an ideal error-free hash which eliminated 85\% of disk queries.
+
+\subsubsection{Probability of False Positives}
+
+For a bit vector of size $m$ with $k$ hashing functions we know the probability for any hash function to not set a bit to one is:
+
+\begin{equation}
+1 - \frac{1}{m}
+\end{equation}
+
+So, for all hashing functions the probability a bit is not set to one is:
+\begin{equation}
+\left(1 - \frac{1}{m} \right)^k
+\end{equation}
+
+And if we have already inserted $n$ elements, the probability for any bit to still be zero is:
+\begin{equation}
+\left(1 - \frac{1}{m} \right)^{kn} \approx e^{-kn/m}
+\end{equation}
+
+Finally, assuming some fraction of the $m$ bits remain unoccupied, the probability of each of these $k$ elements being set to one for a value currently not in the set (i.e., a false positive) is give by:
+
+\begin{equation}
+(1 - e^{-kn/m})^k
+\end{equation}
+
+Which approaches 1 in both the limits of $n$ approaching $m$ and $k$ towards infinity as expected.
+
+\subsubsection{Optimal Number of Hash Functions}
+
+Given our previous results, we can then optimize $k$, the number of hash functions, for a given $m$ and $n$ to provide a minimum false positive chance. 
+
+Here we let $g = k\cdot ln(1 - e^{-kn/m})$ and $f = e^g$. We can then minimize the false positive probability $f$ by minimizing $g$ with respect to $k$.
+
+\begin{equation}
+\frac{dg}{dk} = ln(1-e^{-kn/m}) + \frac{kn}{m}\frac{e^{-kn/m}}{1-e^{-kn/m}}
+\end{equation}
+
+We can then find that this derivative is equal to zero when
+
+\begin{equation}
+k = \frac{m}{n}ln2
+\end{equation}
+
+Which is a global minimum for the function.
+
+\subsubsection{Costs} 
+
+Similar to other hash tables, Bloom filters provide $O(1)$ (constant) insertion and lookup times. However, as the number of hash functions increases, the constant cost of computing all $k$ hashes can become very large.
+
+Deletions, without completely rehashing all values, are not possible due to the fact that any item in the hash table may have common bit indices with any number of other items. Removing any one item may result in false negative lookups for other items. Therefore, deletions require $O(n)$ time to rehash each value.
+
+A Bloom Filter is composed of exactly $m$ bits, giving us $O(m)$ space.
+
+\subsubsection{Variations and Extensions}
+
+In recent years many variations of the Bloom filter have been proposed to improve some of its weaker points. Some of these include Counting Filters, proposed by Fan et al.\cite{fan}, provides the ability to delete items from the hash table without rehashing. Bloomier Filters, proposed by Chazelle et al.\cite{chazelle}, allowing arbitrary functions to be performed on the hash table as opposed to queries. And Scalable Bloom Filters, proposed by Almeida et al.\cite{almeida}, which allows the size of the Bloom Filter to scale as items are inserted to keep a reasonable false positive rate.
+
+\subsection{Quotient Filter}
+
+The quotient filter was introduced in 2011 by Bender, et. al \cite{bender}. Similar to the Bloom filter, the quotient filter provides space efficient means to provide a probabilistic set query. Given the result of a hash value $p$ bits in length, we break the result into a quotient, $q$ bits in length, and remainder, $r$ bits in length. This is a technique known as \emph{quotienting}, which was first coined by Knuth\cite{knuth}. To store the values we create $2^q$ slots, each of which has 3 bits containing the fingerprint and another $r$ bits to hold the remainder. 
+
+To insert or query a value we first take its hash and break it into quotient ($q$) and remainder ($r$). We check the fingerprint at position $q$ and, if empty, insert $r$ into the remainder at position $q$. If the fingerprint is not empty it describes what type of value is currently inserted at that position. The value that is currently occupying slot $q$ could either be another value that hashed to the same value of $q$ (all of these values together form a \emph{run}) or another value that was shifted higher in the bit vector by a value before it. The initial run, as well as any number of subsequent runs form a \emph{cluster} which can be terminated by either a new cluster or an empty slot. The fingerprint at each slot describes the various combinations of run and cluster positions, e.g., an empty slot is denoted by $000$, $100$ denotes a run in its canonical slot, $111$ is the continuation of a run shifted from its canonical slot, etc.
+
+A query is comprised of finding the initial fingerprint and following the fingerprints to where that value should be placed. If the remainder in that position matches $r$ we return true. Recall, however, that multiple values could hash to identical $q$s and $r$s, thereby giving us a possibility of false positives.
+
+An insertion works much in the same way as a query. Once the slot where the value should be is found, if the remainders do not match, the subsequent slots are shifted further along and their fingerprints are updated if required.
+
+\subsubsection{Probability of False Positives}
+
+Given a quotient filter of size $m$, which is occupied by $n$ elements, we define its load factor to be $\alpha = n/m$. Therefore, as described by Bloom, et. at, \cite{bender}, given a good hash function, the probability of a false positive is described as:
+
+\begin{equation}
+1 - e^{\alpha/2^r} \leq 2^{-r}
+\end{equation}
+
+Where $r$, again, is the number of bits describing the remainder.
+
+\subsubsection{Costs}
+
+The time required for insertion can, it its very worst case, require up to $O(n)$ time. This could occur if the load factor was quite large or through the use of bad hashing techniques.
+
+Bender, et al.\cite{bender} argue, through the use of Chernoff bound analysis, that with a reasonable load factor and a uniformly distributing hash function, there is a high probability that most runs will be of length $O(1)$ and that all runs will be of length $O(logm)$.
+
+Due to the fact that, with proper load factors and hashing functions, most insertions and queries are $O(1)$ time, quotient filters are often faster than Bloom filters due to the fact that only a single hash is generated \cite{spillane}.
+
+Deletions are possible with quotient filters. However, much like insertions can provide false positives, there is no guarantee that the value you are removing is the actual value you intended without a priori knowledge of the contents. There is also the possibility that a second item attempted to insert itself into the quotient filter but was ignored due to a false positive which would effectively result in the deletion of multiple items.
+
+Much like the bloom filter, the quotient filter requires $O(m)$ space. However, while the bloom filter required only $O(1)$ bits for each slot, the quotient filter requires $O(3 + q)$ bits for each slot. In practical applications this results in a 10-15\% increase in space compared to a Bloom filter of similar capacity and false positive rate \cite{spillane}.
+
+\subsubsection{Variations and Extensions}
+
+As noted by Bender\cite{bender}, quotient filters have the innate ability to map their values to integers allowing two quotient filters to be merged (in a process similar to merge sort) without rehashing any values. This allows an extension known as the Cascade Filter, a collection of quotient filters organized into a data structure similar to a Cache-Oblivious Lookahead Array\cite{bender2}.
+
+\section{Performance Analysis}
+
+\subsection{Implementation Details}
+
+\subsubsection{Bloom Filter}
+
+While Bloom filters are fairly straightforward to implement, there is some room for improvements. As an alternative to having $k$ unique hash functions or techniques, Kirsch et. al \cite{kirsch}, describe a technique to simulate any number of hashes from two original hash functions. Given two hash functions $h_1(x)$ and $h_2(x)$ a new hash function $g_i(x)$ can be generated by:
+
+\begin{equation}
+g_i(x) = h_1(x) + i \cdot h_2(x)
+\end{equation}
+
+Where $i$ is any real number. In our code we generate $k$ hash functions from two original functions and a for loop over $0 \leq i < k$.
+
+\subsubsection{Quotient Filter}
+
+In our quotient filter we have two distinct bit vectors, one for the fingerprints and one for the remainders. We also restrict the size of $r$ to that of an unsigned integer, giving us a bit vector a size of $q\cdot sizeof(unsigned integer)$. In this way writes and reads to the remainder vector require constant time and require no bit fiddling to find its index. Fingerprints are also restricted to the minimum three bits such any fingerprint will occupy at most two indices in the fingerprint bit vector which has a size of $3\cdot sizeof(unsigned char)$. In this way we can unroll our lookup and read loops, slightly increasing the speed of our queries.
+
+\subsubsection{Hashing Functions}
+
+While cryptographically secure hashing functions would most likely provide better distribution of values, resulting in fewer hard and soft collisions, their associated run-times would dramatically increase the constants associated with our insertions and queries. The naive implementation of a Bloom filter, in particular, would suffer greatly. In addition, our efforts to deal with collisions (e.g., the Bloom filter's $k$ hashes) reduce our need for a perfect distribution. In one real-world implementation of a Bloom filter \footnote{Dablooms pull notes -- https://github.com/bitly/dablooms/pull/19} a speed increase of nearly 800\% was achieved by switching from the cryptographic hash function md5 to murmur hashing.
+
+For our implementation we've used Google's CityHash \footnote{Google's CityHash family of hash functions -- http://code.google.com/p/cityhash/} for the quotient filter and Murmur3 \footnote{MurmurHash3 -- http://code.google.com/p/smhasher/wiki/MurmurHash3}, in addition to CityHash, for the Bloom filter's second generating hash function. Both hashing functions were chosen for their speed, resulting hash distribution, and ease of use. In earlier versions of our software original implementations of the hashing functions were created. However, these proved to be unreliable and were quickly replaced with the official implementations as an original hash implementation was already beyond the scope of this project.
+
+\subsection{Evaluation Environment and Tools}
+
+All testing of our data structures was performed on the Aviary computer systems hosted at The University of Manitoba. They were chosen for up-to-date performance, collection of profiling software, as well as their availability to us.
+
+All timing operations were performed using the built-in c time functions included in $<time.h>$.
+
+All cache performance was evaluated using the valgrind\footnote{Valgrind -- http://valgrind.org/}, and more specifically the cachegrind\footnote{Cachegrind -- http://valgrind.org/info/tools.html\#cachegrind}, tool-set. Cachegrind emulates a Harvard architecture cache for a given program and records the number of instruction, as well as data, read, and write cache hits and misses. For our purposes we are only concerned with data cache misses, and thus the instruction misses are ignored in our discussion.
+
+\subsection{False-Positive Performance}
+
+To test the false positive rate of our data structures, we varied the free parameters in each corresponding equation and attempted to query $2^{26}$ (67108864) values known to not be in the set. In the figures below we plot the rate of false positives versus one variable while holding the others constant for both the Bloom and Quotient Filter. For comparison we also plot the expected theoretical number of false positives using the equations derived earlier.
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.5]{bloom_fp_vs_num_hashes}
+	\caption{Rate of false positives on a Bloom Filter with a constant inverse load factor of 20 and varying the number of hashes used. Note the minimum at $20\cdot ln(2) = 13.86$ -- the theoretical optimal number of hashing functions.}
+\end{figure}
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.4]{bloom_fp_vs_load}
+	\caption{Rate of false positives on a Bloom Filter using the optimal number of hash functions while varying the load.}
+\end{figure}
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.6]{quotient_fp_vs_bit_length}
+	\caption{Rate of false positives on a Quotient Filter with a constant inverse load factor of 20 while varying the number of bits stored by the remainder.}
+\end{figure}
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.6]{quotient_fp_vs_load}
+	\caption{Rate of false positives on a Quotient Filter using a constant remainder bit length of three while varying the load.}
+\end{figure}
+
+\subsection{Run-Time Performance}
+
+To evaluate the query performance, we evaluated both filters with varying load factors under optimal conditions. For the Bloom Filter optimal meaning the optimal number of hash functions for each load factor. The Quotient Filter, on the other hand, was provided enough remainder bits to effectively have a zero chance of encountering a false positive. Multiple batches of $2^{27}$ (134217728) random queries were performed at each load factor, which were then averaged and plotted with (standard deviation) error bars.
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.5]{bloom_timing}
+	\caption{Number of random search queries per millisecond the Bloom Filter can perform at varying levels of load factors (higher is better).}
+\end{figure}
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.5]{quotient_timing}
+	\caption{Number of random search queries per millisecond the Quotient Filter can perform at varying levels of load factors (higher is better).}
+\end{figure}
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.5]{vs_timing}
+	\caption{Number of random search queries per millisecond both the Bloom and Quotient Filter can perform at varying levels of load factors (higher is better). }
+\end{figure}
+
+\subsection{Cache Performance}
+First we evaluated the number of cache read and writes to ensure that a similar number of cache reads and writes were being performed by both the Quotient and Bloom filter. Comparing Read and Write miss ratios would be very misleading otherwise. As described in the graphs below, this is definitely the case. At average load factors both filters perform nearly identical amounts of cache reads.
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.5]{cache_perf}
+	\caption{Number of cache reads and writes performed by both the Quotient and Bloom filter at varying inverse load factors.}
+\end{figure}
+
+Similar to our other profiling techniques we looked at both filters, varying their loads and performing a large number of queries. As it turns out Valgrind/Cachegrind increase the runtime significantly so the number of queries was reduced to $2^{25}$.
+
+\begin{figure}[!htb]
+\centering
+	\includegraphics[scale=0.5]{cache_perf_2}
+	\caption{Cache read and write miss ratios for both the Quotient and Bloom filter.}
+\end{figure}
+
+
+\section{Discussion}
+We found our data structures to very closely follow the theoretical false-positive rates while maintaining a zero false-negative rate. Therefore it is very likely that both the statistical methods of Bloom and Bender are correct, and that our data structures were properly constructed to specification.
+
+Our data also shows that in run time performance the Quotient Filter does not live up to its expectations. At all load levels the Bloom filter is able to perform more query operations per second. This may be due to the fact that we have optimized the generation of our hash functions beyond the naive implementation originally described by Bloom. The higher variance in the Quotient Filters timings may be explained by the fact that Quotient Filters only have expected constant insertion and searching. Certain sequences of insertions and queries could result in slightly higher running times, although it is very unlikely.
+
+There is the possibility that some of the Quotient Filters performance issues were due to suboptimal implementation. However, Bender et al., \cite{bender} do not provide much more than a guideline and pseudo-code which was, of course, carefully followed and implemented to the absolute best of our ability. 
+
+Cache performance was less illuminating that we had hoped. While there very clearly similar numbers of cache accesses at reasonable load factors, and demonstratively less cache read misses for the Quotient Filter in these same regions, the differences are not particularly significant. Further cache analysis could be performed at higher RAM loads, i.e., when there is significant swapping to virtual memory. However, we decided an appropriate analysis for this type of data structure would be at typical use cases. Therefore the analysis was done where the data structures could be contained entirely in RAM and with average load factors.
+
+\section{Conclusion}
+
+We found that a well implemented Bloom Filter to have better run-time performance of queries on a static data structure at all load factors. The Quotient Filter, on the other hand, could provide much better false positive rates given adequate space while also having slightly better cache read performance.
+
+Currently a case can be made for use of both data structures, in particular if further modern optimizations are made to the Bloom Filter. It remains up to the user to determine what are acceptable values of space, time, and false positive ratios.
+
+\newpage
+\appendix
+\section{Source Code}
+All source code for both the Bloom Filter and the Quotient Filter are available on our GitHub page\footnote{Abloom on GitHub -- \url{https://github.com/swansonr/Abloom}}.
+
+\section{Special Thanks}
+A special thanks to our close, personal friend, Michael Zapp for entertaining our numerous and lengthy questions about software performance and cache profiling.
+
+\begin{thebibliography}{99} % Bibliography - this is intentionally simple in this template
+
+\bibitem{bloom}
+Bloom, B. H "Space/Time Trade-Offs in Hash Coding with Allowable Errors"
+
+\bibitem{bender}
+Bender, M. A; et al, "Don't Thrash: How to Cache your Hash on Flash",  PVLDB, 5(11):1627-1637, 2012. 
+
+\bibitem{google}
+Chang, Fay; et. al (2006), "Bigtable: A Distributed Storage System for Structured Data", Seventh Symposium on Operating System Design and Implementation
+
+\bibitem{bitcoin}
+Hearn, M (2012), "Bitcoin Improvement Proposal 0037: Connection Bloom Filtering" \\
+\newblock{\it https://github.com/bitcoin/bips/blob/master/bip-0037.mediawiki} (Accessed March 22, 2014)
+
+\bibitem{chemicals}
+Baldi, P; et. al (2008), "Speeding Up Chemical Database Searches Using a Proximity Filter Based on the Logical Exclusive OR", Journal of Chemical Information and Modeling, 2008, 48, 1367--1378
+
+\bibitem{knuth}
+Knuth, D (1973). The Art of Computer Programming:Searching and Sorting, volume 3. Section 6.4, exercise 13: Addison Wesley.
+
+\bibitem{spillane}
+Spillane, R. P; (2012), "Efficient, Scalable, and Versatile Application and System Transaction Management for Direct Storage Layers", Ph.D. Thesis, Stony Brook University
+
+\bibitem{kirsch}
+Kirsch, A.; Mitzenmacher, M; (2006), "Less hashing, same performance: Building a better bloom filter", In Proc. the 14th Annual European Symposium on Algorithms
+
+\bibitem{fan}
+L. Fan, P. Cao, J. Almeida, and A. Z. Broder; (2000), "Summary cache: a scalable wide-area Web cache sharing protocol", IEEE/ACM Trans. on Networking, 8(3):281-293
+
+\bibitem{chazelle}
+Chazelle, Bernard; Kilian, Joe; Rubinfeld, Ronitt; Tal, Ayellet (2004), "The Bloomier filter: an efficient data structure for static support lookup tables", Proceedings of the Fifteenth Annual ACM-SIAM Symposium on Discrete Algorithms, pp. 30–39
+
+\bibitem{almeida}
+Almeida, Paulo; Baquero, Carlos; Preguica, Nuno; Hutchison, David (2007), "Scalable Bloom Filters", Information Processing Letters 101 (6): 255–261
+
+\bibitem{bender2}
+Bender, M. A; et al, "Cache-Oblivious Streaming B-Trees" Proceedings of the 41st Annual Symposium on Foundations of Computer Science (FOCS), pages 399-409, 2000.
+
+\bibitem{book}
+Mitzenmacher, M.; Upfal E.; "Probability and Computing: Randomized Algorithms and Probabilistic Analysis"
+
+\end{thebibliography}
+\end{document}
+
+
